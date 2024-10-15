@@ -1,0 +1,16 @@
+clc;
+clear;
+close;
+
+
+dir_parent = '/data/e/stand_counts/stand_count_dataset/22r_grace_calibration/16_5/chosen/60bestframes/';
+all_img =  dir(fullfile(dir_parent,'*.png'));
+
+
+
+for i=1:length(all_img)
+    img = imread(fullfile(dir_parent, all_img(i).name));
+    fname = all_img(i).name;
+    imwrite((img), strcat(dir_parent, 'rename/', fname(1:end-7), sprintf( '%03d', i),'.tif'))
+    
+end

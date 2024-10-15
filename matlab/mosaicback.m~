@@ -1,0 +1,84 @@
+function [label_final_frag_channel] = mosaicback(directory, att, fragments)
+%it will mosaic back fragment from yolo and adjust the label with respect
+%to the whole mosaic
+%   input: directory, attribute of fragments, and frag size
+%   output: mosaic and label
+for a = 1 : length(fragments)
+    frag = fragments(a);
+
+    all_img =  dir(fullfile(directory, strcat('frag_', string(frag), '/'), '*.png'));
+    all_txt =  dir(fullfile(directory, strcat('frag_', string(frag), '/'), '*.txt'));
+
+    w_sep = att(a).w;
+    h_sep = att(a).h;
+    h_ori = att(a).height;
+    w_ori = att(a).width;
+    c_ori = att(a).channel;
+
+    h_end = h_sep(1,end)+(0.1*frag);
+    w_end = w_sep(1,end)+(0.1*frag);
+
+    % img_moz_back = zeros(h_sep(1,end-1)+frag, w_sep(1,end-1)+frag, 3);
+    label_final = [];
+
+
+    for k = 1:length(all_img)/((length(h_sep)-1)*(length(w_sep)-1))    
+
+        for i=1:length(h_sep)-1
+           for j=1:length(w_sep)-1
+              %index correction
+              z = (k-1)*((length(h_sep)-1)*(length(w_sep)-1))+(i-1)*(length(w_sep)-1)+j
+              filename = fullfile(directory, 'fragment/', all_img(z).name);
+              txt_name = fullfile(directory, 'fragment/', all_txt(z).name);
+
+
+              %  read txt file
+              fid = fopen(txt_name);
+              M = textscan(fid, '%f %f %f %f %f %f', 'Delimiter',' '); 
+              fclose(fid);
+
+              label_original = [M{1,1}, M{1,2}, M{1,3}, M{1,4}, M{1,5}, M{1,6}];
+
+              %filtering prediction's label that does not make sense
+              label = label_original(label_original(:,4)>0.001 & label_original(:,5)>0.001 & label_original(:,4)<1 & label_original(:,5)<1, :);
+
+    %           Img_ori = imread(filename);
+    %           imgg = double(Img_ori);
+    %           counter = 1;
+    %           disp(all_img(z).name);
+    % 
+    %            img_moz_back(h_sep(i)+1:h_sep(i)+frag, w_sep(j)+1:w_sep(j)+frag, :) = imgg;
+    %            counter = counter+1;
+    %            img_moz_back = uint8(img_moz_back);
+        %        imshow(uint8(img_moz_back));
+
+               %fragment the label
+               temp_label(:, 1) = label(:, 1);
+               temp_label(:, 2) = (label(:, 2)* frag + (w_sep(j)+1));
+               temp_label(:, 4) = label(:, 4) * frag ;
+               temp_label(:, 3) = (label(:, 3) * frag +(h_sep(i)+1));
+               temp_label(:, 5) = label(:, 5) * frag ;
+               temp_label(:, 6) = label(:, 6);
+
+               label_final = [label_final; temp_label];
+               temp_label = [];
+               label_original = [];
+               label = [];
+               M = [];
+            end 
+        end   
+
+    end
+    norm_label_final = label_final;
+
+    norm_label_final(:,2:5) = double([label_final(:,2)/w_ori, label_final(:,3)/h_ori, label_final(:,4)/w_ori, label_final(:,5)/h_ori]);
+
+    writematrix(norm_label_final, strcat(directory, all_img(z).name(1:end-14), 'mosaic_prediction_normalized_', string(frag), '.txt'), 'Delimiter',' ');
+
+    label_final(:,2:5) = int32([label_final(:,2)-label_final(:,4)./2, label_final(:,3)-label_final(:,5)./2, label_final(:,4),label_final(:,5)]);
+
+    label_final_frag_channel(:,:,a) = label_final(:,:);
+    % img_moz_back_ori_size = img_moz_back(1:h_ori, 1:w_ori, 1:c_ori);
+    end
+end
+
