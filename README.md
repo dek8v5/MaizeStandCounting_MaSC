@@ -155,6 +155,7 @@ The local repository should contain at least:
 ```text
 MaizeStandCounting_MaSC/
 ├── data/
+├── models/
 ├── yolov9_model/
 ├── results/
 ├── requirement.txt
@@ -164,7 +165,8 @@ MaizeStandCounting_MaSC/
 Download the files from the Zenodo record and organize them as follows:
 
 - **`data/`**: input imagery and supporting data used by MaSC, including the data required for mosaic/raw-frame processing.
-- **`yolov9_model/`**: trained YOLOv9 model weights; the expected weight file is `yolov9_model/best.pt`.
+- **`models/`**: unchanged downloaded model archive contents.
+- **`yolov9_model/`**: runtime location for the trained weight file; MaSC expects `yolov9_model/best.pt` in the documented commands.
 - **`results/`**: archived MaSC outputs and evaluation results.
 
 If the Zenodo files are distributed as compressed archives, extract each archive into its corresponding directory.
@@ -173,9 +175,11 @@ For example:
 
 ```bash
 unzip <data_archive>.zip -d data/
-unzip <model_archive>.zip -d yolov9_model/
+unzip <model_archive>.zip -d models/
 unzip <results_archive>.zip -d results/
 ```
+
+After extracting the model archive, copy its published `best.pt` to `yolov9_model/best.pt`. The short README inside each directory describes its archive contents and installation checks.
 
 The large archived files are hosted on Zenodo rather than duplicated in the GitHub repository.
 
@@ -184,7 +188,9 @@ The large archived files are hosted on Zenodo rather than duplicated in the GitH
 MaSC processes UAV imagery using either mosaic or raw-frame input.
 
 <div align="center">
-  <img src="figure/dmc_pipeline.png" alt="MaSC mosaic-mode and raw-frame-mode workflows" width="100%"/>
+  <img src="figure/dmc_pipeline.png"
+       alt="MaSC mosaic-mode and raw-frame-mode workflows"
+       width="70%"/>
 </div>
 
 The trained detector has three classes: a box classified as class 0, 1, or 2 represents one, two, or three plants, respectively. Consequently, each retained detection contributes `class_id + 1` plants to its assigned row.
