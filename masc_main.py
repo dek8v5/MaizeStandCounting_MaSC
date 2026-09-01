@@ -31,14 +31,14 @@ import os
 import time
 from matplotlib import pyplot as plt
 from yolov9.detect import *
-from dmc_source.tif2png import tif2png, rot_radon
-from dmc_source.fragment_mosaic import fragment_mosaic
-from dmc_source.mosaicback import mosaicback
-from dmc_source.draw_bbox import draw_bbox
-from dmc_source.detect_range import detect_range
-from dmc_source.detect_row import detect_row
-from dmc_source.count_object import count_object
-from dmc_source.mosaic_label import mosaic_label
+from masc_python.tif2png import tif2png, rot_radon
+from masc_python.fragment_mosaic import fragment_mosaic
+from masc_python.mosaicback import mosaicback
+from masc_python.draw_bbox import draw_bbox
+from masc_python.detect_range import detect_range
+from masc_python.detect_row import detect_row
+from masc_python.count_object import count_object
+from masc_python.mosaic_label import mosaic_label
 import subprocess
 from datetime import datetime
 import csv
