@@ -3,12 +3,12 @@
 
 
 '''
-project: Maize Stand Counting (MaSC)
+project: DeepMaizeCounter
 
 author: Dewi Kharismawati
 
 about this script:
-    - this is masc_main
+    - this is dmc_main
     - this expects mosaic of seedling field
     - result will be png file of stand count contains:
           + seedling is detected
@@ -19,7 +19,7 @@ about this script:
 
 to call:
 
-     python masc_main.py -image_path /data/e/dmc/data/summary_best/4_ranges/global_mosaic_7.png -save_path /data/e/dmc/data/summary_best/4_ranges/dmc_result/ -mode mosaic -num_classes 3
+     python dmc_main.py -image_path /data/e/dmc/data/summary_best/4_ranges/global_mosaic_7.png -save_path /data/e/dmc/data/summary_best/4_ranges/dmc_result/ -mode mosaic -num_classes 3
 
 '''
 
@@ -31,14 +31,14 @@ import os
 import time
 from matplotlib import pyplot as plt
 from yolov9.detect import *
-from src.tif2png import tif2png, rot_radon
-from src.fragment_mosaic import fragment_mosaic
-from src.mosaicback import mosaicback
-from src.draw_bbox import draw_bbox
-from src.detect_range import detect_range
-from src.detect_row import detect_row
-from src.count_object import count_object
-from src.mosaic_label import mosaic_label
+from dmc_source.tif2png import tif2png, rot_radon
+from dmc_source.fragment_mosaic import fragment_mosaic
+from dmc_source.mosaicback import mosaicback
+from dmc_source.draw_bbox import draw_bbox
+from dmc_source.detect_range import detect_range
+from dmc_source.detect_row import detect_row
+from dmc_source.count_object import count_object
+from dmc_source.mosaic_label import mosaic_label
 import subprocess
 from datetime import datetime
 import csv
