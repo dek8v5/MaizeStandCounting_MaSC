@@ -69,38 +69,6 @@ Then install the project requirements:
 ```bash
 pip install -r requirement.txt
 ```
-
-#### Dependency resolution note
-
-The original dependency set contained an incompatible combination:
-
-```text
-y-py==0.5.9
-jupyter-ydoc==0.2.4
-ypy-websocket==0.8.4
-```
-
-`jupyter-ydoc==0.2.4` requires `y-py>=0.5.3,<0.6.0`, while `ypy-websocket==0.8.4` requires `y-py>=0.6.0,<0.7.0`.
-
-The working environment uses:
-
-```text
-ypy-websocket==0.8.2
-```
-
-with:
-
-```text
-y-py==0.5.9
-jupyter-ydoc==0.2.4
-```
-
-After this change:
-
-```bash
-pip install -r requirement.txt
-```
-
 completed successfully.
 
 No separate build-constraint file was needed for the Python 3.8 environment.
