@@ -16,6 +16,9 @@ import matplotlib.pyplot as plt
 import argparse
 from datetime import datetime
 from skimage.transform import radon
+from scipy.signal import find_peaks
+
+
 
 def radon_transform(img, theta_range):
     sinogram = []
@@ -103,56 +106,107 @@ def tif2png(img_path):
     return img_cropped_uint8
 
 
-def rot_radon(img):
-    
-    img_bw = 2 * img[:, :, 1] - img[:, :, 0] - img[:, :, 2]
 
-    _, th = cv2.threshold(img_bw, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    img_bw = img_bw > th
-    print(th)
+def rot_radon(img, target_max_dim=1200):
+    if img is None:
+        raise ValueError("rot_radon received an empty image.")
 
+    print("Original image shape:", img.shape)
+
+    h, w = img.shape[:2]
+
+    if max(h, w) > target_max_dim:
+        scale = target_max_dim / float(max(h, w))
+        new_w = int(round(w * scale))
+        new_h = int(round(h * scale))
+        img_small = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    else:
+        scale = 1.0
+        img_small = img.copy()
+
+    print("Radon image shape:", img_small.shape)
+    print("Radon scale factor:", scale)
+
+    img_float = img_small.astype(np.float32)
+
+    B = img_float[:, :, 0]
+    G = img_float[:, :, 1]
+    R = img_float[:, :, 2]
+
+    img_bw = 2.0 * G - R - B
+    img_bw = cv2.normalize(img_bw, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+    otsu_threshold, binary = cv2.threshold(img_bw, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    print("Otsu threshold:", otsu_threshold)
+
+    img_bw = binary > 0
     img_mask = circular_mask(img_bw)
-    
-    plt.figure()
-    plt.imshow(img_mask)
-    plt.title('masked Image')
-    plt.axis('off')
-    plt.savefig('/data/e/dmc/code/figure.png') #just temp to save
 
-    theta = np.linspace(0., 180., max(img_bw.shape), endpoint=False)
-    sinogram = radon(img_mask, theta)
-    print('after radon')
-    plt.figure()
-    plt.plot(theta, np.sum(sinogram, axis=0))
-    plt.title('Radon transform sum')
-    plt.xlabel('Angle (degrees)')
-    plt.ylabel('Sum')
-    plt.show()
+    theta = np.arange(0.0, 180.0, 1.0)
+
+    print("Running Radon transform with", len(theta), "angles...")
+
+    sinogram = radon(img_mask.astype(np.float32), theta=theta, circle=True)
+
+    print("Radon transform finished.")
 
     variance = np.var(sinogram, axis=0)
-    max_angl = np.argmax(variance)
-    angl = theta[max_angl]
 
-    plt.figure()
-    plt.plot(theta, variance)
-    plt.plot(angl, variance[max_angl], 'rx')
-    plt.text(angl + 5, variance[max_angl] - 5, str(angl))
-    plt.title('Radon transform variance 0-180°')
-    plt.xlabel('Angle (degrees)')
-    plt.ylabel('Variance')
-    plt.show()
+    first_idx = np.argmax(variance)
+    first_angle = theta[first_idx]
 
-    angl = 360 - angl
-    ExG_rot = rotate_image(img_bw, angl)
-    img_rot = rotate_image(img, angl)
+    orthogonal_angle = (first_angle + 90.0) % 180.0
+    angle_diff = np.abs(((theta - orthogonal_angle + 90.0) % 180.0) - 90.0)
+    orthogonal_indices = np.where(angle_diff <= 10.0)[0]
 
-    img_rot = (img_rot * 255).astype(np.uint8)
+    second_idx = orthogonal_indices[np.argmax(variance[orthogonal_indices])]
 
-    plt.figure()
-    plt.imshow(img_rot)
-    plt.title('Rotated Image')
-    plt.axis('off')
-    plt.show()
+    candidate_indices = [first_idx, second_idx]
+
+    best_idx = None
+    best_score = -1
+
+    print("Radon candidate orientations:")
+
+    for idx in candidate_indices:
+        projection = sinogram[:, idx]
+
+        window = max(3, len(projection) // 100)
+        smooth_projection = np.convolve(projection, np.ones(window) / window, mode='same')
+
+        signal_range = np.percentile(smooth_projection, 95) - np.percentile(smooth_projection, 5)
+        prominence = max(signal_range * 0.10, 1e-6)
+        min_distance = max(1, len(projection) // 100)
+
+        peaks, properties = find_peaks(smooth_projection, prominence=prominence, distance=min_distance)
+
+        if len(peaks) > 0:
+            score = len(peaks)
+        else:
+            score = 0
+
+        print("Angle:", theta[idx], "degrees | repeated peaks:", score)
+
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+
+    detected_angle = theta[best_idx]
+
+    rotation_angle = 90.0 - detected_angle
+
+    if rotation_angle > 90.0:
+        rotation_angle -= 180.0
+    elif rotation_angle < -90.0:
+        rotation_angle += 180.0
+
+    print("Selected Radon angle:", detected_angle, "degrees")
+    print("Rotation applied:", rotation_angle, "degrees")
+
+    img_rot = rotate_image(img, rotation_angle)
+
+    print("Rotated full image shape:", img_rot.shape)
 
     return img_rot
 

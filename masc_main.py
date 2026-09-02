@@ -19,7 +19,7 @@ about this script:
 
 to call:
 
-     python dmc_main.py -image_path /data/e/dmc/data/summary_best/4_ranges/global_mosaic_7.png -save_path /data/e/dmc/data/summary_best/4_ranges/dmc_result/ -mode mosaic -num_classes 3
+     python masc_main.py -image_path data/mosaic/global_mosaic_7.png -save_path results/mosaic-mode-publish -mode mosaic -num_classes 3
 
 '''
 
@@ -60,18 +60,27 @@ def dmc_from_mosaic(image_path, save_path, num_class):
     
     print('after raw_files')
     print(image_path)
-    img = cv2.imread(image_path)
-    '''
+    #img = cv2.imread(image_path)
+    
     if file_format == 'png':
-        img = cv2.imread(image_path[0])
-        img = rot_radon(img)
+        img = cv2.imread(image_path)
+        if img is None:
+           raise FileNotFoundError(f"Could not read image: {image_path}")
+
+
     else:
-        img = tif2png(os.path.join(image_path[0]))
-        cv2.imwrite(os.path.join(image_path, 'preprocessed_mosaic.png'), img) 
-    '''
+        img = tif2png(image_path)
+        cv2.imwrite(os.path.join(save_path, 'preprocessed_mosaic.png'),img)
     #h_ori, w_ori, c = img.shape
     #print(h_ori, w_ori)
-    
+ 
+    print("Before Radon:", img.shape)
+    img = rot_radon(img)
+    print("After Radon:", img.shape)
+
+    cv2.imwrite(os.path.join(save_path, "rotated_mosaic_after_radon.png"),img)
+
+
     att = fragment_mosaic(img, frag, save_path)
 
     frag_dir = os.path.join(save_path, f'fragment_{frag[0]}')
@@ -115,21 +124,31 @@ def run_yolo_detection(image_path, save_path):
     print('inside run yolo')
     print(image_path)
     print(save_path)
+    
+    save_path = os.path.abspath(save_path)
+    project_dir = os.path.dirname(save_path)
+    run_name = os.path.basename(save_path)
+    print('project_dir: ', project_dir)
+    print('run_name: ', run_name)
     command = [
-        'python', '/data/e/dmc/code/yolov9/detect.py',
+        'python', 'yolov9/detect.py',
         '--source', image_path,
         '--img', '640',
         '--device', '0,1',
-        '--weights', '/data/e/dmc/code/yolov9/runs/train/yolov9-c17/weights/best.pt',
-        '--name', save_path,
+        '--weights', 'yolov9_model/best.pt',
+        '--project', project_dir,
+        '--name', run_name,
         '--save-txt',
         #'--save-crop',
         '--save-conf',
         '--conf-thres', '0.3'
     ]
-    
+    yolo_start_time = time.time() 
     result = subprocess.run(command, capture_output=True, text=True)
-    
+    yolo_elapsed_time = time.time() - yolo_start_time
+    print('==========================================================')
+    print('YOLO processing time: ', yolo_elapsed_time)
+
     if result.returncode == 0:
         print("detection is done. wohoooooo")
     else:
@@ -142,7 +161,7 @@ def counting(img, save_path, label_all, num_class, frag='raw'):
     each_range = True
     to_right = True
     num_border = 0
-    num_range = 7
+    #num_range = 7
     #conditions = (label_all_raw[:, 1] > 0) & (label_all_raw[:, 1] < w_ori) & \
     #         (label_all_raw[:, 2] > 0) & (label_all_raw[:, 2] < h_ori) & \
     #         (label_all_raw[:, 3] > 0) & (label_all_raw[:, 3] < w_ori) & \
@@ -187,7 +206,7 @@ def counting(img, save_path, label_all, num_class, frag='raw'):
     center_crop.flat[lind] = 1
 
     print('before row separator')
-    range_separator, img_w_range = detect_range(img_with_bbx, center_crop, num_range, True, True, save_path)
+    range_separator, img_w_range = detect_range(img_with_bbx, center_crop, True, True, save_path)
     print('range separator: ', range_separator)
     cv2.imwrite(os.path.join(save_path, ('mosaic_with_range_'+f'fragment_{frag}'+'.png')), np.uint8(img_w_range))
     row_separator, img_w_range_row = detect_row(img_w_range, center_crop, range_separator, each_range, True, True, save_path)
