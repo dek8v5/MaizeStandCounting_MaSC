@@ -18,9 +18,10 @@ about this script:
           + stand count on each row is printed
 
 to call:
-
-     python masc_main.py -image_path data/mosaic/global_mosaic_7.png -save_path results/mosaic-mode-publish -mode mosaic -num_classes 3
-
+     mosaic mode:
+          python masc_main.py -image_path data/mosaic/global_mosaic_7.png -save_path results/mosaic-mode-publish -mode mosaic -num_classes 3
+     raw mode:
+         python masc_main.py -image_path -save_path results/raw_stage1 -mode raw -num_classes 3 -hm 
 '''
 
 
@@ -31,7 +32,7 @@ import os
 import time
 from matplotlib import pyplot as plt
 from yolov9.detect import *
-from masc_python.tif2png import tif2png, rot_radon
+from masc_python.tif2png import tif2png, rot_radon, label_rotation
 from masc_python.fragment_mosaic import fragment_mosaic
 from masc_python.mosaicback import mosaicback
 from masc_python.draw_bbox import draw_bbox
@@ -44,7 +45,7 @@ from datetime import datetime
 import csv
 
 
-def dmc_from_mosaic(image_path, save_path, num_class):
+def dmc_from_mosaic(image_path, save_path, num_class, mode):
 
     
     frag = [1280]
@@ -74,50 +75,87 @@ def dmc_from_mosaic(image_path, save_path, num_class):
     #h_ori, w_ori, c = img.shape
     #print(h_ori, w_ori)
  
-    print("Before Radon:", img.shape)
-    img = rot_radon(img)
-    print("After Radon:", img.shape)
+    #print("Before Radon:", img.shape)
 
-    cv2.imwrite(os.path.join(save_path, "rotated_mosaic_after_radon.png"),img)
+    radon_start_time = time.time()
+    img, degree = rot_radon(img)
+    radon_elapsed_time = time.time() - radon_start_time
+    print('==========================================================')
+    print('RADON processing time: ', radon_elapsed_time)
 
+    #print("After Radon:", img.shape)
 
+    #cv2.imwrite(os.path.join(save_path, "rotated_mosaic_after_radon.png"),img)
+
+    frag_start_time = time.time()
     att = fragment_mosaic(img, frag, save_path)
+    frag_elapsed_time = time.time() - frag_start_time
+    print('==========================================================')
+    print('PATCHIFY processing time: ', frag_elapsed_time)
+
 
     frag_dir = os.path.join(save_path, f'fragment_{frag[0]}')
    
     yolo_path = os.path.join(frag_dir, 'yolo_result')
+
     print(yolo_path)	
    	# after fragmented, feed the fragments to seedling detector
    	# ----------------------------------------------------- 
    	#
+    yolo_start_time = time.time()
     run_yolo_detection(frag_dir, yolo_path)
+    yolo_elapsed_time = time.time() - yolo_start_time
+    print('==========================================================')
+    print('YOLO processing time: ', yolo_elapsed_time)
 
+
+    mozback_start_time = time.time()
     label_all = mosaicback(yolo_path, att, frag)    #filtered out the label (remove duplication from overlap area)
     #print(label_all)
-    counting(img, save_path, label_all, num_class, frag[0])
+    mozback_elapsed_time = time.time() - mozback_start_time
+    print('==========================================================')
+    print('MOSAIC BACK & BBOX Aggregation processing time: ', mozback_elapsed_time)
+
+
+    counting(img, save_path, label_all, num_class, mode, frag[0])
 		
 		
-def dmc_from_raw(image_path, save_path, homography, num_class):
+def dmc_from_raw(image_path, save_path, homography, num_class, mode):
     #if not os.path.exists(save_path):
     #   os.mkdir(save_path)
 			 
     print(save_path)
+    #rawyolo_start_time = time.time()
     yolo_path = os.path.join(save_path, 'yolo_result')
     #yolo_time = time.time()
+    
+    #star of the show
     #run_yolo_detection(image_path, yolo_path)
+    
     #print('yolo time:', time.time() - yolo_time)
-    label_all = mosaic_label(yolo_path, homography, os.path.join(yolo_path, 'labels_mosaic'))
+    
+    #label_all = mosaic_label(yolo_path, homography, os.path.join(yolo_path, 'labels_mosaic'))
     #print(len(label_all))
-
-   
-
+    
+    #just for test
+    #label_file = os.path.join(save_path, "2024-10-04_23-00-16_full.txt")
+    #np.savetxt(label_file, label_all, fmt=["%d", "%.6f", "%.6f", "%.6f", "%.6f", "%.6f"])
+    #rawyolo_elapsed_time = time.time() - rawyolo_start_time
+    #print('==========================================================')
+    #print('RAW yolo pred Aggregation processing time: ', rawyolo_elapsed_time)
+    
     mosaic_path = os.path.join(save_path, 'mosaic')
+    
     all_file_inside_mosaic_path = sorted([f for f in os.listdir(mosaic_path) if f.endswith('.png')])
     img = cv2.imread(os.path.join(mosaic_path, all_file_inside_mosaic_path[0]))
     h,w,c = img.shape
     #normalized the label first before sending it to counting
-		
-    counting(img, save_path, label_all, num_class)
+	
+    #justforpaper
+    label_file = os.path.join(save_path, "2024-10-04_23-00-16_full.txt")
+    label_all = np.loadtxt(label_file, ndmin=2)
+
+    counting(img, save_path, label_all, num_class, mode)
 
 def run_yolo_detection(image_path, save_path):
     #result_dir
@@ -143,11 +181,9 @@ def run_yolo_detection(image_path, save_path):
         '--save-conf',
         '--conf-thres', '0.3'
     ]
-    yolo_start_time = time.time() 
+
     result = subprocess.run(command, capture_output=True, text=True)
-    yolo_elapsed_time = time.time() - yolo_start_time
-    print('==========================================================')
-    print('YOLO processing time: ', yolo_elapsed_time)
+
 
     if result.returncode == 0:
         print("detection is done. wohoooooo")
@@ -155,12 +191,13 @@ def run_yolo_detection(image_path, save_path):
         print("ummm, something is wrong in running yolo")
 
 		
-def counting(img, save_path, label_all, num_class, frag='raw'):
+def counting(img, save_path, label_all, num_class, mode, frag='raw'):
     custom_color = True
     h_ori, w_ori, c = img.shape
     each_range = True
     to_right = True
     num_border = 0
+    
     #num_range = 7
     #conditions = (label_all_raw[:, 1] > 0) & (label_all_raw[:, 1] < w_ori) & \
     #         (label_all_raw[:, 2] > 0) & (label_all_raw[:, 2] < h_ori) & \
@@ -169,11 +206,28 @@ def counting(img, save_path, label_all, num_class, frag='raw'):
     #label
     #label_all_filtered = label_all[(label_all[:, 1:5] > 0) & (label_all[:, 1:5] < 1)]
     #label_all = label_all_raw[conditions]
+    #comment only for test
+    #filtered_label = label_all
+    
+    nms_start_time = time.time() 
     
     index = cv2.dnn.NMSBoxes(label_all[:, 1:5], label_all[:, 5], score_threshold = 0.25, nms_threshold=0.25)
-    
     filtered_label = label_all[index, :]
+    
+    NMS_elapsed_time = time.time() - nms_start_time
+    print('==========================================================')
+    print('NMS processing time: ', NMS_elapsed_time)
+
+
     #print(' bbox filtered: ', filtered_label)
+    if mode == 'raw': 
+       radon_start_time = time.time()
+       img, rot_angle = rot_radon(img)
+       filtered_label = label_rotation(img, filtered_label, rot_angle)
+       radon_elapsed_time = time.time() - radon_start_time
+       print('==========================================================')
+       print('RADON processing time: ', radon_elapsed_time)
+    
     img_with_bbx = draw_bbox(img, filtered_label, num_class, custom_color, False)
     cv2.imwrite(os.path.join(save_path, ('mosaic_with_bbox_'+f'fragment_{frag}'+'.png')), np.uint8(img_with_bbx))
 
@@ -193,7 +247,7 @@ def counting(img, save_path, label_all, num_class, frag='raw'):
 
 		
     
-  
+    
     center_crop = np.zeros((h_ori, w_ori))
     y_coords = (filtered_label[:, 2] + (filtered_label[:, 4] / 2)).astype(int)
     x_coords = (filtered_label[:, 1] + (filtered_label[:, 3] / 2)).astype(int)
@@ -206,11 +260,24 @@ def counting(img, save_path, label_all, num_class, frag='raw'):
     center_crop.flat[lind] = 1
 
     print('before row separator')
+    range_start_time = time.time()
     range_separator, img_w_range = detect_range(img_with_bbx, center_crop, True, True, save_path)
+    
+    #range detection
     print('range separator: ', range_separator)
     cv2.imwrite(os.path.join(save_path, ('mosaic_with_range_'+f'fragment_{frag}'+'.png')), np.uint8(img_w_range))
+    range_elapsed_time = time.time() - range_start_time
+    print('==========================================================')
+    print('RANGE processing time: ', range_elapsed_time)
+
+    #row detection
+    row_start_time = time.time()
     row_separator, img_w_range_row = detect_row(img_w_range, center_crop, range_separator, each_range, True, True, save_path)
+    row_elapsed_time = time.time() - row_start_time
+    print('==========================================================')
+    print('ROW processing time: ', row_elapsed_time)
     print('row_separator: ', row_separator)
+
     cv2.imwrite(os.path.join(save_path, ('mosaic_with_row_'+f'fragment_{frag}'+'.png')), np.uint8(img_w_range_row))
     
     
@@ -222,9 +289,14 @@ def counting(img, save_path, label_all, num_class, frag='raw'):
     #plt.figure()
     #plt.imshow(img_w_range_row.astype(np.uint8))
     #plt.show()
-    
+   
+    count_start_time = time.time()
     img, count_per_row, final_row = count_object(img_w_range_row, range_separator, row_separator, filtered_label, to_right, num_border, save_path)
-    
+    count_elapsed_time = time.time() - count_start_time
+    print('==========================================================')
+    print('COUNT processing time: ', count_elapsed_time)
+    #print('row_separator: ', _separator)
+
     #plt.figure()
     #plt.imshow(img)
     #plt.show()
@@ -263,9 +335,9 @@ if __name__ == "__main__":
   
   print(args.mode)
   if args.mode=="mosaic":
-    dmc_from_mosaic(image_path, save_path, num_classes)
+    dmc_from_mosaic(image_path, save_path, num_classes, args.mode)
   else:
-    dmc_from_raw(image_path, save_path, args.hm, num_classes)
+    dmc_from_raw(image_path, save_path, args.hm, num_classes, args.mode)
 
   print("Elapsed time: ", time.time() - start_time)
 		

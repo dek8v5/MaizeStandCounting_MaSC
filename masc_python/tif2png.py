@@ -33,11 +33,78 @@ def radon_transform(img, theta_range):
     return np.array(sinogram)
 
 
-def rotate_image(img, angle):
-    center = (img.shape[1] // 2, img.shape[0] // 2)
+#def rotate_image(img, angle):
+#    center = (img.shape[1] // 2, img.shape[0] // 2)
+#    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+#    rotated_img = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+#    return rotated_img
+
+
+
+def rotation_matrix(img, angle):
+    h, w = img.shape[:2]
+    center = (w / 2.0, h / 2.0)
+
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    rotated_img = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+
+    cos = abs(M[0, 0])
+    sin = abs(M[0, 1])
+
+    new_w = int(np.ceil(h * sin + w * cos))
+    new_h = int(np.ceil(h * cos + w * sin))
+
+    M[0, 2] += new_w / 2.0 - center[0]
+    M[1, 2] += new_h / 2.0 - center[1]
+
+    return M, new_w, new_h
+
+
+def rotate_image(img, angle):
+    M, new_w, new_h = rotation_matrix(img, angle)
+
+    rotated_img = cv2.warpAffine(
+        img,
+        M,
+        (new_w, new_h),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0
+    )
+
     return rotated_img
+
+
+def label_rotation(img, labels, angle):
+    M, new_w, new_h = rotation_matrix(img, angle)
+
+    rotated_labels = labels.copy().astype(float)
+
+    for i in range(len(labels)):
+        x = labels[i, 1]
+        y = labels[i, 2]
+        bw = labels[i, 3]
+        bh = labels[i, 4]
+
+        corners = np.array([
+            [x,      y,      1.0],
+            [x + bw, y,      1.0],
+            [x + bw, y + bh, 1.0],
+            [x,      y + bh, 1.0]
+        ])
+
+        rotated = corners @ M.T
+
+        x_min = rotated[:, 0].min()
+        y_min = rotated[:, 1].min()
+        x_max = rotated[:, 0].max()
+        y_max = rotated[:, 1].max()
+
+        rotated_labels[i, 1] = x_min
+        rotated_labels[i, 2] = y_min
+        rotated_labels[i, 3] = x_max - x_min
+        rotated_labels[i, 4] = y_max - y_min
+
+    return rotated_labels
 
 
 def circular_mask(image):
@@ -208,7 +275,10 @@ def rot_radon(img, target_max_dim=1200):
 
     print("Rotated full image shape:", img_rot.shape)
 
-    return img_rot
+    return img_rot, rotation_angle
+
+
+
 
 if __name__ == "__main__":
 
