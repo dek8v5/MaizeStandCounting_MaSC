@@ -125,24 +125,24 @@ def dmc_from_raw(image_path, save_path, homography, num_class, mode):
     #   os.mkdir(save_path)
 			 
     print(save_path)
-    rawyolo_start_time = time.time()
+    #rawyolo_start_time = time.time()
     yolo_path = os.path.join(save_path, 'yolo_result')
-
-    #star of the show
-    run_yolo_detection(image_path, yolo_path)
+    #yolo_time = time.time()
     
-
-    label_all = mosaic_label(yolo_path, homography, os.path.join(yolo_path, 'labels'))
+    #star of the show
+    #run_yolo_detection(image_path, yolo_path)
+    
+    #print('yolo time:', time.time() - yolo_time)
+    #print("label path : " , os.path.join(yolo_path, 'labels'))
+    #label_all = mosaic_label(yolo_path, homography, os.path.join(yolo_path, 'labels'))
     #print(len(label_all))
     
     #just for test
     #label_file = os.path.join(save_path, "2024-10-04_23-00-16_full.txt")
     #np.savetxt(label_file, label_all, fmt=["%d", "%.6f", "%.6f", "%.6f", "%.6f", "%.6f"])
-    
-
-    rawyolo_elapsed_time = time.time() - rawyolo_start_time
-    print('==========================================================')
-    print('RAW yolo pred Aggregation processing time: ', rawyolo_elapsed_time)
+    #rawyolo_elapsed_time = time.time() - rawyolo_start_time
+    #print('==========================================================')
+    #print('RAW yolo pred Aggregation processing time: ', rawyolo_elapsed_time)
     
     mosaic_path = os.path.join(save_path, 'mosaic')
     
@@ -152,8 +152,8 @@ def dmc_from_raw(image_path, save_path, homography, num_class, mode):
     #normalized the label first before sending it to counting
 	
     #justforpaper
-    #label_file = os.path.join(save_path, "2024-10-04_23-00-16_full.txt")
-    #label_all = np.loadtxt(label_file, ndmin=2)
+    label_file = os.path.join(save_path, "2024-10-04_23-00-16_full.txt")
+    label_all = np.loadtxt(label_file, ndmin=2)
 
     counting(img, save_path, label_all, num_class, mode)
 
@@ -211,7 +211,7 @@ def counting(img, save_path, label_all, num_class, mode, frag='raw'):
     
     nms_start_time = time.time() 
     
-    index = cv2.dnn.NMSBoxes(label_all[:, 1:5], label_all[:, 5], score_threshold = 0.25, nms_threshold=0.25)
+    index = cv2.dnn.NMSBoxes(label_all[:, 1:5], label_all[:, 5], score_threshold = 0.15, nms_threshold=0.15)
     filtered_label = label_all[index, :]
     
     NMS_elapsed_time = time.time() - nms_start_time
@@ -220,7 +220,7 @@ def counting(img, save_path, label_all, num_class, mode, frag='raw'):
 
 
     #print(' bbox filtered: ', filtered_label)
-    if mode == 'raw': 
+    if mode == 'raw':
        original_img = img.copy()
        radon_start_time = time.time()
        img, rot_angle = rot_radon(img)
