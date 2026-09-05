@@ -21,7 +21,7 @@ to call:
      mosaic mode:
           python masc_main.py -image_path data/mosaic/global_mosaic_7.png -save_path results/mosaic-mode-publish -mode mosaic -num_classes 3
      raw mode:
-         python masc_main.py -image_path -save_path results/raw_stage1 -mode raw -num_classes 3 -hm 
+         python masc_main.py -image_path data/group_002/ -save_path results/raw_group2 -mode raw -num_classes 3 -hm data/group_002/H_asift_group_002.csv
 '''
 
 
